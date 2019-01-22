@@ -60,7 +60,7 @@ class EarthdataLogin extends OAuth2 {
    * @param {string} [state] - an optional state to pass to Earthdata Login
    * @returns {string} the Earthdata Login authorization URL
    */
-  getAuthorizationUrl(state) {
+  getAuthorizationUrl(state, userAgent) {
     const url = new URL(this.earthdataLoginUrl);
 
     url.pathname = '/oauth/authorize';
@@ -70,6 +70,10 @@ class EarthdataLogin extends OAuth2 {
 
     if (state) {
       url.searchParams.set('state', state);
+    }
+
+    if (userAgent && !userAgent.startsWith('Mozilla')) {
+      url.searchParams.set('app_type', '401');
     }
 
     return url.toString();

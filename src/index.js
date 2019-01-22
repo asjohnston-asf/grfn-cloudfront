@@ -101,6 +101,15 @@ async function handleRedirectRequest(params = {}) {
 }
 
 
+function getUserAgent(request) {
+  let userAgent = null;
+  if (request.headers && 'user-agent' in request.headers) {
+    userAgent = request.headers['user-agent'][0].value;
+  }
+  return userAgent;
+}
+
+
 async function handleFileRequest(params = {}) {
   const {
     authClient,
@@ -108,7 +117,9 @@ async function handleFileRequest(params = {}) {
     request,
   } = params;
 
-  const redirectToGetAuthorizationCode = redirectResponse(authClient.getAuthorizationUrl(request.uri));
+  const userAgent = getUserAgent(request);
+  const redirectUrl = authClient.getAuthorizationUrl(request.uri, userAgent)
+  const redirectToGetAuthorizationCode = redirectResponse(redirectUrl);
   const accessToken = getAccessTokenFromRequest(request);
 
   if (!accessToken) {
