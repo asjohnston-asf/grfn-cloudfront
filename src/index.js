@@ -4,6 +4,7 @@
 const EarthdataLoginClient = require('./lib/EarthdataLogin');
 const jwt = require('jsonwebtoken');
 const urljoin = require('url-join');
+const querystring = require('querystring');
 const SecretsManager = require('aws-sdk/clients/secretsmanager');
 const secretsManager = new SecretsManager({region: 'us-east-1'});
 
@@ -47,20 +48,6 @@ function parseCookies(headers) {
 }
 
 
-function parseQueryString(queryString) {
-  let parsedParameters = {};
-  if (queryString) {
-    queryString.split('&').forEach((parameter) => {
-      if (parameter) {
-        const parts = parameter.split('=');
-        parsedParameters[decodeURIComponent(parts[0].trim())] = decodeURIComponent(parts[1].trim());
-      }
-    });
-  }
-  return parsedParameters;
-}
-
-
 function isRedirectRequest(request) {
   return request.uri === '/redirect';
 }
@@ -83,7 +70,7 @@ async function handleRedirectRequest(params = {}) {
     request
   } = params;
 
-  const queryStringParameters = parseQueryString(request.querystring);
+  const queryStringParameters = querystring.parse(request.querystring);
   const accessTokenResponse = await authClient.getAccessToken(queryStringParameters.code);
 
   const payload = {
