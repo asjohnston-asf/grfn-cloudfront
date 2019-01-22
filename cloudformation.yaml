@@ -1,0 +1,140 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  ursClientId:
+    Type: String
+
+  ursClientPassword:
+    Type: String
+    NoEcho: true
+
+  ursHostname:
+    Type: String
+    AllowedValues:
+    - https://uat.urs.earthdata.nasa.gov/
+    - https://urs.earthdata.nasa.gov/
+
+  publicKey:
+    Type: String
+
+  privateKey:
+    Type: String
+    NoEcho: true
+
+Outputs:
+
+  DomainName:
+    Value: !GetAtt Distribution.DomainName
+
+Resources:
+
+  Secret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: grfn-cloudfront-secret
+      SecretString: !Sub |-
+        {
+          "ursClientId": "${ursClientId}",
+          "ursClientPassword": "${ursClientPassword}",
+          "ursHostname": "${ursHostname}",
+          "cloudfrontDomain": "${Distribution.DomainName}",
+          "publicKey": "${publicKey}",
+          "privateKey": "${privateKey}"
+        }
+
+  ContentBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-content"
+
+  LogBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-logs"
+
+  OriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Ref AWS::StackName
+
+  ContentBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ContentBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Resource: !Sub "${ContentBucket.Arn}/*"
+          Action: s3:GetObject
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Ref AWS::StackName
+        Enabled: True
+        PriceClass: PriceClass_100
+        Origins:
+        - Id: !Ref ContentBucket
+          DomainName: !GetAtt ContentBucket.DomainName
+          S3OriginConfig:
+            OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${OriginAccessIdentity}"
+        DefaultCacheBehavior:
+          ForwardedValues:
+            QueryString: False
+          TargetOriginId: !Ref ContentBucket
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: viewer-request
+            LambdaFunctionARN: !Ref LambdaVersionA
+        Logging:
+          Bucket: !GetAtt LogBucket.DomainName
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref AWS::StackName
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Action: sts:AssumeRole
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            - edgelambda.amazonaws.com
+          Effect: Allow
+      Policies:
+      - PolicyName: policy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:*.${AWS::StackName}*"
+          - Effect: Allow
+            Action: secretsmanager:getSecretValue
+            Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:grfn-cloudfront-secret*"
+
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref AWS::StackName
+      Code: src/
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt Role.Arn
+      Runtime: nodejs8.10
+      Timeout: 5
+
+  LambdaVersionA:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref Lambda

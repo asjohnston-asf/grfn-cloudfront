@@ -1,0 +1,19 @@
+{
+  "name": "grfn-cloudfront",
+  "version": "1.0.0",
+  "description": "",
+  "author": "",
+  "license": "ISC",
+  "main": "index.js",
+  "engines": {
+    "node": ">=8.10.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "got": "^9.6.0",
+    "jsonwebtoken": "^8.4.0",
+    "url-join": "^4.0.0"
+  }
+}
