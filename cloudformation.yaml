@@ -17,6 +17,7 @@ Parameters:
 
   secretKey:
     Type: String
+    MinLength: 32
     NoEcho: true
 
 Outputs:
