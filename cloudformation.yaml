@@ -15,10 +15,7 @@ Parameters:
     - https://uat.urs.earthdata.nasa.gov/
     - https://urs.earthdata.nasa.gov/
 
-  publicKey:
-    Type: String
-
-  privateKey:
+  secretKey:
     Type: String
     NoEcho: true
 
@@ -39,8 +36,7 @@ Resources:
           "ursClientPassword": "${ursClientPassword}",
           "ursHostname": "${ursHostname}",
           "cloudfrontDomain": "${Distribution.DomainName}",
-          "publicKey": "${publicKey}",
-          "privateKey": "${privateKey}"
+          "secretKey": "${secretKey}"
         }
 
   ContentBucket:

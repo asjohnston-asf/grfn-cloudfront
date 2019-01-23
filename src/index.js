@@ -5,6 +5,7 @@ const EarthdataLoginClient = require('./lib/EarthdataLogin');
 const jwt = require('jsonwebtoken');
 const urljoin = require('url-join');
 const querystring = require('querystring');
+const cookieLib = require('cookie');
 const SecretsManager = require('aws-sdk/clients/secretsmanager');
 const secretsManager = new SecretsManager({region: 'us-east-1'});
 
@@ -62,27 +63,29 @@ function getAccessTokenFromRequest(request) {
 }
 
 
+function getExpDate() {
+  return new Date(Date.now() + 60000);
+}
+
+
 async function handleRedirectRequest(params = {}) {
   const {
     authClient,
     distributionUrl,
-    privateKey,
+    secretKey,
     request
   } = params;
 
   const queryStringParameters = querystring.parse(request.querystring);
   const accessTokenResponse = await authClient.getAccessToken(queryStringParameters.code);
 
+  const expDate = getExpDate();
   const payload = {
-    username: accessTokenResponse.username
+    username: accessTokenResponse.username,
+    exp: Math.floor(expDate.getTime()/1000)
   };
-
-  const options = {
-    algorithm: 'RS256',
-    expiresIn: 60
-  };
-
-  const accessToken = jwt.sign(payload, privateKey, options);
+  const accessToken = jwt.sign(payload, secretKey);
+  const cookie = cookieLib.serialize('accessToken', accessToken, {expires: expDate});
 
   return {
     status: '307',
@@ -94,7 +97,7 @@ async function handleRedirectRequest(params = {}) {
       }],
       'set-cookie': [{
         key: 'Set-Cookie',
-        value: `accessToken=${accessToken}`
+        value: cookie
       }]
     }
   };
@@ -113,12 +116,12 @@ function getUserAgent(request) {
 async function handleFileRequest(params = {}) {
   const {
     authClient,
-    publicKey,
+    secretKey,
     request,
   } = params;
 
   const userAgent = getUserAgent(request);
-  const redirectUrl = authClient.getAuthorizationUrl(request.uri, userAgent)
+  const redirectUrl = authClient.getAuthorizationUrl(request.uri, userAgent);
   const redirectToGetAuthorizationCode = redirectResponse(redirectUrl);
   const accessToken = getAccessTokenFromRequest(request);
 
@@ -128,7 +131,7 @@ async function handleFileRequest(params = {}) {
   }
 
   try {
-    const payload = jwt.verify(accessToken, publicKey);
+    const payload = jwt.verify(accessToken, secretKey);
     console.log(payload['username']);
   } catch(err) {
     console.log('bad token');
@@ -143,8 +146,7 @@ async function handleRequest(params = {}) {
   const {
     authClient,
     distributionUrl,
-    publicKey,
-    privateKey,
+    secretKey,
     request
   } = params;
 
@@ -152,14 +154,14 @@ async function handleRequest(params = {}) {
     return await handleRedirectRequest({
       authClient,
       distributionUrl,
-      privateKey,
+      secretKey,
       request
     });
   }
 
   return await handleFileRequest({
     authClient,
-    publicKey,
+    secretKey,
     request
   });
 }
@@ -179,8 +181,7 @@ exports.handler = async function(event, context) {
   const response = await handleRequest({
     authClient: earthdataLoginClient,
     distributionUrl: `https://${config.cloudfrontDomain}/`,
-    publicKey: config.publicKey,
-    privateKey: config.privateKey,
+    secretKey: config.secretKey,
     request: request
   });
 
