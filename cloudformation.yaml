@@ -88,7 +88,7 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
           LambdaFunctionAssociations:
           - EventType: viewer-request
-            LambdaFunctionARN: !Ref LambdaVersionA
+            LambdaFunctionARN: !Ref LambdaVersionREPLACE
         Logging:
           Bucket: !GetAtt LogBucket.DomainName
 
@@ -125,13 +125,13 @@ Resources:
     Properties:
       FunctionName: !Ref AWS::StackName
       Code: src/
-      Handler: index.handler
+      Handler: main.lambda_handler
       MemorySize: 128
       Role: !GetAtt Role.Arn
-      Runtime: nodejs8.10
+      Runtime: python3.7
       Timeout: 5
 
-  LambdaVersionA:
+  LambdaVersionREPLACE:
     Type: AWS::Lambda::Version
     Properties:
       FunctionName: !Ref Lambda
