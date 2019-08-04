@@ -31,6 +31,8 @@ def redirect_to_login(request):
     redirect_uri = 'https://' + config['cloudfrontDomain'] + '/oauth'
     urs = OAuth2Session(config['ursClientId'], redirect_uri=redirect_uri, state=state)
     authorization_url, state = urs.authorization_url(authorization_base_url)
+    if 'user-agent' not in request['headers'] or not request['headers']['user-agent'][0]['value'].startswith('Mozilla'):
+        authorization_url += '&app_type=401'
     response = redirect_response(authorization_url)
     return response
 
