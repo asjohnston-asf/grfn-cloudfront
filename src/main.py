@@ -20,6 +20,7 @@ response = requests.get('https://ip-ranges.amazonaws.com/ip-ranges.json')
 response.raise_for_status()
 ip_ranges = response.json()
 aws_ip_blocks = [ip_network(item['ip_prefix']) for item in ip_ranges['prefixes'] if item['service'] == 'AMAZON']
+aws_ip_blocks += [ip_network(item['ipv6_prefix']) for item in ip_ranges['ipv6_prefixes'] if item['service'] == 'AMAZON']
 
 s3 = boto3.client('s3')
 
