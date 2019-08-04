@@ -37,7 +37,8 @@ Resources:
           "ursClientPassword": "${ursClientPassword}",
           "ursHostname": "${ursHostname}",
           "cloudfrontDomain": "${Distribution.DomainName}",
-          "secretKey": "${secretKey}"
+          "secretKey": "${secretKey}",
+          "bucket": "${ContentBucket}"
         }
 
   ContentBucket:
@@ -68,6 +69,11 @@ Resources:
             CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
           Resource: !Sub "${ContentBucket.Arn}/*"
           Action: s3:GetObject
+        - Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Resource: !Sub "${ContentBucket.Arn}"
+          Action: s3:ListBucket
 
   Distribution:
     Type: AWS::CloudFront::Distribution
@@ -88,9 +94,10 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
           LambdaFunctionAssociations:
           - EventType: viewer-request
-            LambdaFunctionARN: !Ref LambdaVersionA
+            LambdaFunctionARN: !Ref LambdaVersionREPLACE
         Logging:
           Bucket: !GetAtt LogBucket.DomainName
+          IncludeCookies: true
 
   Role:
     Type: AWS::IAM::Role
@@ -119,19 +126,22 @@ Resources:
           - Effect: Allow
             Action: secretsmanager:getSecretValue
             Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:grfn-cloudfront-secret*"
+          - Effect: Allow
+            Action: s3:GetObject
+            Resource: !Sub "${ContentBucket.Arn}/*"
 
   Lambda:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref AWS::StackName
       Code: src/
-      Handler: index.handler
+      Handler: main.lambda_handler
       MemorySize: 128
       Role: !GetAtt Role.Arn
-      Runtime: nodejs8.10
+      Runtime: python3.7
       Timeout: 5
 
-  LambdaVersionA:
+  LambdaVersionREPLACE:
     Type: AWS::Lambda::Version
     Properties:
       FunctionName: !Ref Lambda
