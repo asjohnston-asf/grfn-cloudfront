@@ -4,6 +4,7 @@ from json import loads
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
 from http.cookies import SimpleCookie
+from ipaddress import ip_network, ip_address
 import boto3
 import requests
 
@@ -14,6 +15,13 @@ config = loads(secret['SecretString'])
 authorization_base_url = config['ursHostname'] + 'oauth/authorize'
 redirect_uri = 'https://' + config['cloudfrontDomain'] + '/oauth'
 urs = OAuth2Session(config['ursClientId'], redirect_uri=redirect_uri)
+
+response = requests.get('https://ip-ranges.amazonaws.com/ip-ranges.json')
+response.raise_for_status()
+ip_ranges = response.json()
+aws_ip_blocks = [ip_network(item['ip_prefix']) for item in ip_ranges['prefixes'] if item['service'] == 'AMAZON']
+
+s3 = boto3.client('s3')
 
 
 def is_oauth_request(request):
@@ -64,6 +72,27 @@ def get_session_token(request):
     return response
 
 
+def request_from_aws(ip):
+    addr = ip_address(ip)
+    for block in aws_ip_blocks:
+        if addr in block:
+            return True
+    return False
+
+
+def redirect_to_s3(key, user_id):
+    signed_url = s3.generate_presigned_url(
+        ClientMethod='get_object',
+        Params={
+            'Bucket': config['bucket'],
+            'Key': key,
+        },
+        ExpiresIn=60,
+    )
+    signed_url += '&userid=' + user_id
+    return redirect_response(signed_url)
+
+
 def lambda_handler(event, context):
     request = event['Records'][0]['cf']['request']
     headers = request['headers']
@@ -81,9 +110,12 @@ def lambda_handler(event, context):
     token = cookie['session-token'].value
     try:
         payload = jwt.decode(token, config['secretKey'], algorithms=['HS256'])
-        print(payload['user_id'])
     except (jwt.DecodeError, jwt.ExpiredSignatureError):
         print('bad session-token')
         return redirect_to_login(request)
+    print(payload['user_id'])
     print(request['uri'])
+    if request_from_aws(request['clientIp']):
+        print('aws request')
+        return redirect_to_s3(request['uri'][1:], payload['user_id'])
     return request
