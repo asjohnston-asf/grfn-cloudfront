@@ -92,6 +92,7 @@ Resources:
             LambdaFunctionARN: !Ref LambdaVersionREPLACE
         Logging:
           Bucket: !GetAtt LogBucket.DomainName
+          IncludeCookies: true
 
   Role:
     Type: AWS::IAM::Role
