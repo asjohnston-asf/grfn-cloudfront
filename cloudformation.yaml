@@ -69,6 +69,11 @@ Resources:
             CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
           Resource: !Sub "${ContentBucket.Arn}/*"
           Action: s3:GetObject
+        - Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Resource: !Sub "${ContentBucket.Arn}"
+          Action: s3:ListBucket
 
   Distribution:
     Type: AWS::CloudFront::Distribution
