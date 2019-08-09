@@ -9,20 +9,30 @@ import boto3
 import requests
 
 secrets_manager = boto3.client('secretsmanager', region_name='us-east-1')
-secret = secrets_manager.get_secret_value(SecretId='grfn-cloudfront-secret')
-config = loads(secret['SecretString'])
-
-authorization_base_url = config['ursHostname'] + 'oauth/authorize'
-redirect_uri = 'https://' + config['cloudfrontDomain'] + '/oauth'
-urs = OAuth2Session(config['ursClientId'], redirect_uri=redirect_uri)
-
-response = requests.get('https://ip-ranges.amazonaws.com/ip-ranges.json')
-response.raise_for_status()
-ip_ranges = response.json()
-aws_ip_blocks = [ip_network(item['ip_prefix']) for item in ip_ranges['prefixes'] if item['service'] == 'AMAZON']
-aws_ip_blocks += [ip_network(item['ipv6_prefix']) for item in ip_ranges['ipv6_prefixes'] if item['service'] == 'AMAZON']
-
 s3 = boto3.client('s3')
+
+config = None
+urs = None
+aws_ip_blocks = None
+
+
+def setup(secret_name):
+    print('setting up')
+
+    global config
+    secret = secrets_manager.get_secret_value(SecretId=secret_name)
+    config = loads(secret['SecretString'])
+
+    global urs
+    redirect_uri = 'https://' + config['cloudfrontDomain'] + '/oauth'
+    urs = OAuth2Session(config['ursClientId'], redirect_uri=redirect_uri)
+
+    global aws_ip_blocks
+    response = requests.get('https://ip-ranges.amazonaws.com/ip-ranges.json')
+    response.raise_for_status()
+    ip_ranges = response.json()
+    aws_ip_blocks = [ip_network(item['ip_prefix']) for item in ip_ranges['prefixes'] if item['service'] == 'AMAZON']
+    aws_ip_blocks += [ip_network(item['ipv6_prefix']) for item in ip_ranges['ipv6_prefixes'] if item['service'] == 'AMAZON']
 
 
 def is_oauth_request(request):
@@ -43,6 +53,7 @@ def redirect_response(url):
 
 
 def redirect_to_login(request):
+    authorization_base_url = config['ursHostname'] + 'oauth/authorize'
     authorization_url, state = urs.authorization_url(authorization_base_url, state=request['uri'])
     if 'user-agent' not in request['headers'] or not request['headers']['user-agent'][0]['value'].startswith('Mozilla'):
         authorization_url += '&app_type=401'
@@ -97,6 +108,9 @@ def redirect_to_s3(key, user_id):
 def lambda_handler(event, context):
     request = event['Records'][0]['cf']['request']
     headers = request['headers']
+
+    if not config:
+        setup(context.function_name.split('.')[-1])
 
     if is_oauth_request(request):
         print('oauth request')

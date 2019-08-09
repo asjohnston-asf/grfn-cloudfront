@@ -30,7 +30,7 @@ Resources:
   Secret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: grfn-cloudfront-secret
+      Name: !Ref AWS::StackName
       SecretString: !Sub |-
         {
           "ursClientId": "${ursClientId}",
@@ -125,7 +125,7 @@ Resources:
             Resource: !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:*.${AWS::StackName}*"
           - Effect: Allow
             Action: secretsmanager:getSecretValue
-            Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:grfn-cloudfront-secret*"
+            Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${AWS::StackName}*"
           - Effect: Allow
             Action: s3:GetObject
             Resource: !Sub "${ContentBucket.Arn}/*"
