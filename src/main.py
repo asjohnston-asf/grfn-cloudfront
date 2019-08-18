@@ -1,12 +1,13 @@
-import jwt
-from requests_oauthlib import OAuth2Session
 from json import loads
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
 from http.cookies import SimpleCookie
 from ipaddress import ip_network, ip_address
-import boto3
+
 import requests
+import jwt
+import boto3
+from requests_oauthlib import OAuth2Session
 
 secrets_manager = boto3.client('secretsmanager', region_name='us-east-1')
 s3 = boto3.client('s3')
@@ -17,26 +18,30 @@ aws_ip_blocks = None
 
 
 def setup(secret_name):
-    print('setting up')
-
     global config
-    secret = secrets_manager.get_secret_value(SecretId=secret_name)
-    config = loads(secret['SecretString'])
+    config = get_config(secret_name)
 
     global urs
     redirect_uri = 'https://' + config['cloudfrontDomain'] + '/oauth'
     urs = OAuth2Session(config['ursClientId'], redirect_uri=redirect_uri)
 
     global aws_ip_blocks
+    aws_ip_blocks = get_aws_ip_blocks()
+
+
+def get_config(secret_name):
+    secret = secrets_manager.get_secret_value(SecretId=secret_name)
+    config = loads(secret['SecretString'])
+    return config
+
+
+def get_aws_ip_blocks():
     response = requests.get('https://ip-ranges.amazonaws.com/ip-ranges.json')
     response.raise_for_status()
     ip_ranges = response.json()
     aws_ip_blocks = [ip_network(item['ip_prefix']) for item in ip_ranges['prefixes'] if item['service'] == 'AMAZON']
     aws_ip_blocks += [ip_network(item['ipv6_prefix']) for item in ip_ranges['ipv6_prefixes'] if item['service'] == 'AMAZON']
-
-
-def is_oauth_request(request):
-    return request['uri'] == '/oauth'
+    return aws_ip_blocks
 
 
 def redirect_response(url):
@@ -61,6 +66,17 @@ def redirect_to_login(request):
     return response
 
 
+def set_cookie_header(token):
+    cookie = SimpleCookie()
+    cookie['session-token'] = token
+    cookie['session-token']['expires'] = 60
+    set_cookie_header = [{
+        'key': 'Set-Cookie',
+        'value': cookie.output(header='')
+    }]
+    return set_cookie_header
+
+
 def get_session_token(request):
     parms = parse_qs(request['querystring'])
     token_uri = config['ursHostname'] + 'oauth/token'
@@ -77,14 +93,11 @@ def get_session_token(request):
     session_token = jwt.encode(payload, config['secretKey'], 'HS256')
     redirect_url = 'https://' + config['cloudfrontDomain'] + parms['state'][0]
     response = redirect_response(redirect_url)
-    response['headers']['set-cookie'] = [{
-        'key': 'Set-Cookie',
-        'value': 'session-token=' + session_token.decode('utf-8'),
-    }]
+    response['headers']['set-cookie'] = set_cookie_header(session_token.decode('utf-8'))
     return response
 
 
-def request_from_aws(ip):
+def is_aws_address(ip):
     addr = ip_address(ip)
     for block in aws_ip_blocks:
         if addr in block:
@@ -112,25 +125,23 @@ def lambda_handler(event, context):
     if not config:
         setup(context.function_name.split('.')[-1])
 
-    if is_oauth_request(request):
-        print('oauth request')
+    if request['uri'] == '/oauth':
         return get_session_token(request)
+
     if 'cookie' not in headers:
-        print('no cookie')
         return redirect_to_login(request)
+
     cookie = SimpleCookie(headers['cookie'][0]['value'])
     if 'session-token' not in cookie:
-        print('no session-token in cookie')
         return redirect_to_login(request)
+
     token = cookie['session-token'].value
     try:
         payload = jwt.decode(token, config['secretKey'], algorithms=['HS256'])
     except (jwt.DecodeError, jwt.ExpiredSignatureError):
-        print('bad session-token')
         return redirect_to_login(request)
-    print(payload['user_id'])
-    print(request['uri'])
-    if request_from_aws(request['clientIp']):
-        print('aws request')
+
+    if is_aws_address(request['clientIp']):
         return redirect_to_s3(request['uri'][1:], payload['user_id'])
+
     return request
