@@ -9,16 +9,22 @@ Parameters:
     Type: String
     NoEcho: true
 
-  ursHostname:
-    Type: String
-    AllowedValues:
-    - https://uat.urs.earthdata.nasa.gov/
-    - https://urs.earthdata.nasa.gov/
-
   secretKey:
     Type: String
     MinLength: 32
     NoEcho: true
+
+  ursHostname:
+    Type: String
+    AllowedValues:
+    - https://uat.urs.earthdata.nasa.gov
+    - https://urs.earthdata.nasa.gov
+    Default: https://urs.earthdata.nasa.gov
+
+  sessionDurationInSeconds:
+    Type: Number
+    MinValue: 0
+    Default: 60
 
 Outputs:
 
@@ -38,7 +44,8 @@ Resources:
           "ursHostname": "${ursHostname}",
           "cloudfrontDomain": "${Distribution.DomainName}",
           "secretKey": "${secretKey}",
-          "bucket": "${ContentBucket}"
+          "bucket": "${ContentBucket}",
+          "sessionDurationInSeconds": ${sessionDurationInSeconds}
         }
 
   ContentBucket:

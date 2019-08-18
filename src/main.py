@@ -58,7 +58,7 @@ def redirect_response(url):
 
 
 def redirect_to_login(request):
-    authorization_base_url = config['ursHostname'] + 'oauth/authorize'
+    authorization_base_url = config['ursHostname'] + '/oauth/authorize'
     authorization_url, state = urs.authorization_url(authorization_base_url, state=request['uri'])
     if 'user-agent' not in request['headers'] or not request['headers']['user-agent'][0]['value'].startswith('Mozilla'):
         authorization_url += '&app_type=401'
@@ -69,7 +69,7 @@ def redirect_to_login(request):
 def set_cookie_header(token):
     cookie = SimpleCookie()
     cookie['session-token'] = token
-    cookie['session-token']['expires'] = 60
+    cookie['session-token']['expires'] = config['sessionDurationInSeconds']
     set_cookie_header = [{
         'key': 'Set-Cookie',
         'value': cookie.output(header='')
@@ -79,13 +79,13 @@ def set_cookie_header(token):
 
 def get_session_token(request):
     parms = parse_qs(request['querystring'])
-    token_uri = config['ursHostname'] + 'oauth/token'
+    token_uri = config['ursHostname'] + '/oauth/token'
     token = urs.fetch_token(token_uri, code=parms['code'][0], client_secret=config['ursClientPassword'])
-    user_profile_uri = config['ursHostname'] + token['endpoint'][1:]
+    user_profile_uri = config['ursHostname'] + token['endpoint']
     response = requests.get(user_profile_uri, headers={'Authorization': token['token_type'] + ' ' + token['access_token']})
     response.raise_for_status()
     user = response.json()
-    expiration_time = datetime.utcnow() + timedelta(seconds=60)
+    expiration_time = datetime.utcnow() + timedelta(seconds=config['sessionDurationInSeconds'])
     payload = {
         'user_id': user['uid'],
         'exp': expiration_time.strftime('%s'),
@@ -142,6 +142,6 @@ def lambda_handler(event, context):
         return redirect_to_login(request)
 
     if is_aws_address(request['clientIp']):
-        return redirect_to_s3(request['uri'][1:], payload['user_id'])
+        return redirect_to_s3(request['uri'].lstrip('/'), payload['user_id'])
 
     return request
