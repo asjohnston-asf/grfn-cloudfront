@@ -137,11 +137,11 @@ def lambda_handler(event, context):
     if request['uri'] == '/oauth':
         return get_session_token(request)
 
-    if 'cookie' not in headers:
+    if not headers.get('cookie'):
         return redirect_to_login(request)
 
     cookie = SimpleCookie(headers['cookie'][0]['value'])
-    if 'session-token' not in cookie:
+    if not cookie.get('session-token'):
         return redirect_to_login(request)
 
     token = cookie['session-token'].value
@@ -151,6 +151,7 @@ def lambda_handler(event, context):
         return redirect_to_login(request)
 
     if is_aws_address(request['clientIp']):
-        return redirect_to_s3(request['uri'].lstrip('/'), payload['user_id'])
+        key = request['uri'].lstrip('/')
+        return redirect_to_s3(key, payload['user_id'])
 
     return request
