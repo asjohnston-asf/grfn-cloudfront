@@ -24,7 +24,7 @@ Parameters:
   sessionDurationInSeconds:
     Type: Number
     MinValue: 0
-    Default: 60
+    Default: 86400
 
 Outputs:
 
@@ -136,6 +136,9 @@ Resources:
           - Effect: Allow
             Action: s3:GetObject
             Resource: !Sub "${ContentBucket.Arn}/*"
+          - Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt ContentBucket.Arn
 
   Lambda:
     Type: AWS::Lambda::Function

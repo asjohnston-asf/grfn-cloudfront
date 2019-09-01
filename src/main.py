@@ -120,7 +120,7 @@ def redirect_to_s3(key, user_id):
             'Bucket': CONFIG['bucket'],
             'Key': key,
         },
-        ExpiresIn=60,
+        ExpiresIn=CONFIG['sessionDurationInSeconds'],
     )
     signed_url += '&userid=' + user_id
     return redirect_response(signed_url)
