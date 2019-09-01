@@ -8,6 +8,7 @@ import requests
 import jwt
 import boto3
 from requests_oauthlib import OAuth2Session
+from oauthlib.oauth2 import InvalidGrantError
 
 SECRETS_MANAGER = boto3.client('secretsmanager', region_name='us-east-1')
 S3 = boto3.client('s3')
@@ -42,6 +43,13 @@ def get_aws_ip_blocks():
     aws_ip_blocks = [ip_network(item['ip_prefix']) for item in ip_ranges['prefixes'] if item['service'] == 'AMAZON']
     aws_ip_blocks += [ip_network(item['ipv6_prefix']) for item in ip_ranges['ipv6_prefixes'] if item['service'] == 'AMAZON']
     return aws_ip_blocks
+
+
+def client_error_response():
+    return {
+        'status': '400',
+        'statusDescription': 'Bad Request',
+    }
 
 
 def redirect_response(url):
@@ -87,8 +95,15 @@ def set_cookie_header(token):
 
 def get_session_token(request):
     parms = parse_qs(request['querystring'])
+    if not parms.get('code'):
+        return client_error_response()
+
     token_uri = CONFIG['ursHostname'] + '/oauth/token'
-    token = URS.fetch_token(token_uri, code=parms['code'][0], client_secret=CONFIG['ursClientPassword'])
+    try:
+        token = URS.fetch_token(token_uri, code=parms['code'][0], client_secret=CONFIG['ursClientPassword'])
+    except InvalidGrantError:
+        return client_error_response()
+
     user_profile_uri = CONFIG['ursHostname'] + token['endpoint']
     response = requests.get(user_profile_uri, headers={'Authorization': token['token_type'] + ' ' + token['access_token']})
     response.raise_for_status()
