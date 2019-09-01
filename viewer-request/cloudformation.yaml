@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  name:
+    Type: String
+
+  ursClientId:
+    Type: String
+
+  ursClientPassword:
+    Type: String
+    NoEcho: true
+
+  secretKey:
+    Type: String
+    MinLength: 32
+    NoEcho: true
+
+  ursHostname:
+    Type: String
+    AllowedValues:
+    - https://uat.urs.earthdata.nasa.gov
+    - https://urs.earthdata.nasa.gov
+    Default: https://urs.earthdata.nasa.gov
+
+  sessionDurationInSeconds:
+    Type: Number
+    MinValue: 0
+    Default: 86400
+
+Outputs:
+
+  LambdaName:
+    Value: !Ref Lambda
+
+Resources:
+
+  Secret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Ref name
+      SecretString: !Sub |-
+        {
+          "ursClientId": "${ursClientId}",
+          "ursClientPassword": "${ursClientPassword}",
+          "ursHostname": "${ursHostname}",
+          "secretKey": "${secretKey}",
+          "sessionDurationInSeconds": ${sessionDurationInSeconds}
+        }
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref name
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Action: sts:AssumeRole
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            - edgelambda.amazonaws.com
+          Effect: Allow
+      Policies:
+      - PolicyName: policy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:*.${name}*"
+          - Effect: Allow
+            Action: secretsmanager:getSecretValue
+            Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${name}*"
+
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref name
+      Code: src/
+      Handler: main.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt Role.Arn
+      Runtime: python3.7
+      Timeout: 5
