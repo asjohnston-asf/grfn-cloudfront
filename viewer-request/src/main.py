@@ -16,12 +16,12 @@ URS = None
 AWS_IP_BLOCKS = None
 
 
-def setup(secret_name):
+def setup(secret_name, cloudfront_domain_name):
     global CONFIG
     CONFIG = get_config(secret_name)
 
     global URS
-    redirect_uri = 'https://' + CONFIG['cloudfrontDomain'] + '/oauth'
+    redirect_uri = 'https://' + cloudfront_domain_name + '/oauth'
     URS = OAuth2Session(CONFIG['ursClientId'], redirect_uri=redirect_uri)
 
 
@@ -100,7 +100,7 @@ def get_session_token(request):
         'exp': expiration_time.strftime('%s'),
     }
     session_token = jwt.encode(payload, CONFIG['secretKey'], 'HS256')
-    redirect_url = 'https://' + CONFIG['cloudfrontDomain'] + parms['state'][0]
+    redirect_url = parms['state'][0]
     response = redirect_response(redirect_url)
     response['headers']['set-cookie'] = set_cookie_header(session_token.decode('utf-8'))
     return response
@@ -112,7 +112,8 @@ def lambda_handler(event, context):
 
     if not CONFIG:
         secret_name = context.function_name.split('.')[-1]
-        setup(secret_name)
+        cloudfront_domain_name = event['Records'][0]['cf']['config']['distributionDomainName']
+        setup(secret_name, cloudfront_domain_name)
 
     if request['uri'] == '/oauth':
         return get_session_token(request)

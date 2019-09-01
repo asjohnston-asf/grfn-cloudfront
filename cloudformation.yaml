@@ -33,20 +33,6 @@ Outputs:
 
 Resources:
 
-  Secret:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      Name: !Ref AWS::StackName
-      SecretString: !Sub |-
-        {
-          "ursClientId": "${ursClientId}",
-          "ursClientPassword": "${ursClientPassword}",
-          "ursHostname": "${ursHostname}",
-          "cloudfrontDomain": "${Distribution.DomainName}",
-          "secretKey": "${secretKey}",
-          "sessionDurationInSeconds": ${sessionDurationInSeconds}
-        }
-
   ContentBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -105,46 +91,19 @@ Resources:
           Bucket: !GetAtt LogBucket.DomainName
           IncludeCookies: true
 
-  Role:
-    Type: AWS::IAM::Role
+  ViewerRequestStack:
+    Type: AWS::CloudFormation::Stack
     Properties:
-      RoleName: !Ref AWS::StackName
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          Action: sts:AssumeRole
-          Principal:
-            Service:
-            - lambda.amazonaws.com
-            - edgelambda.amazonaws.com
-          Effect: Allow
-      Policies:
-      - PolicyName: policy
-        PolicyDocument:
-          Version: 2012-10-17
-          Statement:
-          - Effect: Allow
-            Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-            Resource: !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:*.${AWS::StackName}*"
-          - Effect: Allow
-            Action: secretsmanager:getSecretValue
-            Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${AWS::StackName}*"
-
-  Lambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Ref AWS::StackName
-      Code: src/
-      Handler: main.lambda_handler
-      MemorySize: 128
-      Role: !GetAtt Role.Arn
-      Runtime: python3.7
-      Timeout: 5
+      Parameters:
+        Name: !Sub "${AWS::StackName}-viewer-request"
+        ursClientId: !Ref ursClientId
+        ursClientPassword: !Ref ursClientPassword
+        secretKey: !Ref secretKey
+        ursHostname: !Ref ursHostname
+        sessionDurationInSeconds: !Ref sessionDurationInSeconds
+      TemplateURL: viewer-request/cloudformation.yaml
 
   LambdaVersionREPLACE:
     Type: AWS::Lambda::Version
     Properties:
-      FunctionName: !Ref Lambda
+      FunctionName: !GetAtt ViewerRequestStack.Outputs.LambdaName
