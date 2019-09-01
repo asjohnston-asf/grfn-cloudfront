@@ -44,7 +44,6 @@ Resources:
           "ursHostname": "${ursHostname}",
           "cloudfrontDomain": "${Distribution.DomainName}",
           "secretKey": "${secretKey}",
-          "bucket": "${ContentBucket}",
           "sessionDurationInSeconds": ${sessionDurationInSeconds}
         }
 
@@ -133,12 +132,6 @@ Resources:
           - Effect: Allow
             Action: secretsmanager:getSecretValue
             Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${AWS::StackName}*"
-          - Effect: Allow
-            Action: s3:GetObject
-            Resource: !Sub "${ContentBucket.Arn}/*"
-          - Effect: Allow
-            Action: s3:ListBucket
-            Resource: !GetAtt ContentBucket.Arn
 
   Lambda:
     Type: AWS::Lambda::Function

@@ -2,7 +2,6 @@ from json import loads
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
 from http.cookies import SimpleCookie
-from ipaddress import ip_network, ip_address
 
 import requests
 import jwt
@@ -11,7 +10,6 @@ from requests_oauthlib import OAuth2Session
 from oauthlib.oauth2 import InvalidGrantError
 
 SECRETS_MANAGER = boto3.client('secretsmanager', region_name='us-east-1')
-S3 = boto3.client('s3')
 
 CONFIG = None
 URS = None
@@ -26,23 +24,11 @@ def setup(secret_name):
     redirect_uri = 'https://' + CONFIG['cloudfrontDomain'] + '/oauth'
     URS = OAuth2Session(CONFIG['ursClientId'], redirect_uri=redirect_uri)
 
-    global AWS_IP_BLOCKS
-    AWS_IP_BLOCKS = get_aws_ip_blocks()
-
 
 def get_config(secret_name):
     secret = SECRETS_MANAGER.get_secret_value(SecretId=secret_name)
     config = loads(secret['SecretString'])
     return config
-
-
-def get_aws_ip_blocks():
-    response = requests.get('https://ip-ranges.amazonaws.com/ip-ranges.json')
-    response.raise_for_status()
-    ip_ranges = response.json()
-    aws_ip_blocks = [ip_network(item['ip_prefix']) for item in ip_ranges['prefixes'] if item['service'] == 'AMAZON']
-    aws_ip_blocks += [ip_network(item['ipv6_prefix']) for item in ip_ranges['ipv6_prefixes'] if item['service'] == 'AMAZON']
-    return aws_ip_blocks
 
 
 def client_error_response():
@@ -120,27 +106,6 @@ def get_session_token(request):
     return response
 
 
-def is_aws_address(ip):
-    addr = ip_address(ip)
-    for block in AWS_IP_BLOCKS:
-        if addr in block:
-            return True
-    return False
-
-
-def redirect_to_s3(key, user_id):
-    signed_url = S3.generate_presigned_url(
-        ClientMethod='get_object',
-        Params={
-            'Bucket': CONFIG['bucket'],
-            'Key': key,
-        },
-        ExpiresIn=CONFIG['sessionDurationInSeconds'],
-    )
-    signed_url += '&userid=' + user_id
-    return redirect_response(signed_url)
-
-
 def lambda_handler(event, context):
     request = event['Records'][0]['cf']['request']
     headers = request['headers']
@@ -161,12 +126,8 @@ def lambda_handler(event, context):
 
     token = cookie['session-token'].value
     try:
-        payload = jwt.decode(token, CONFIG['secretKey'], algorithms=['HS256'])
+        jwt.decode(token, CONFIG['secretKey'], algorithms=['HS256'])
     except (jwt.DecodeError, jwt.ExpiredSignatureError):
         return redirect_to_login(request)
-
-    if is_aws_address(request['clientIp']):
-        key = request['uri'].lstrip('/')
-        return redirect_to_s3(key, payload['user_id'])
 
     return request
