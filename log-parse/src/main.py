@@ -63,7 +63,7 @@ def get_user_id(cookie_string):
     cookie = SimpleCookie(cookie_string)
     if not cookie.get('session-token'):
         return ''
-    payload = jwt.decode(cookie['session-token'].value)
+    payload = jwt.decode(cookie['session-token'].value, verify=False)
     return payload['user_id']
 
 
