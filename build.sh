@@ -1,4 +1,5 @@
 pip3 install -t viewer-request/src/ -r viewer-request/requirements.txt
+pip3 install -t log-parse/src/ -r log-parse/requirements.txt
 find . -name "__pycache__" | xargs rm -R
 find . -name "*dist-info" | xargs rm -R
 sed "s/REPLACE/$(date +%s)/" cloudformation.yaml > cf.yaml

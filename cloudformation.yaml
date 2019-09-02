@@ -92,7 +92,6 @@ Resources:
             LambdaFunctionARN: !Ref LambdaVersionREPLACE
         Logging:
           Bucket: !GetAtt LogBucket.DomainName
-          Prefix: cloudfront/
           IncludeCookies: true
 
   ElasticSearchDomain:
@@ -146,6 +145,16 @@ Resources:
         ursHostname: !Ref ursHostname
         sessionDurationInSeconds: !Ref sessionDurationInSeconds
       TemplateURL: viewer-request/cloudformation.yaml
+
+  LogParseStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        Name: !Sub "${AWS::StackName}-log-parse"
+        DomainArn: !GetAtt ElasticSearchDomain.DomainArn
+        DomainEndpoint: !GetAtt ElasticSearchDomain.DomainEndpoint
+        LogBucket: !Ref LogBucket
+      TemplateURL: log-parse/cloudformation.yaml
 
   LambdaVersionREPLACE:
     Type: AWS::Lambda::Version
