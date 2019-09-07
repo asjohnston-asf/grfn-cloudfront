@@ -98,7 +98,7 @@ Resources:
     Type: AWS::Elasticsearch::Domain
     Properties:
       DomainName: !Ref AWS::StackName
-      ElasticsearchVersion: 7.1
+      ElasticsearchVersion: 6.3
       AccessPolicies: !Sub |-
         {
           "Version": "2012-10-17",
