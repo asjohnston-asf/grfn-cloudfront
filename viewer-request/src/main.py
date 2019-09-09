@@ -90,13 +90,15 @@ def get_session_token(request):
     except InvalidGrantError:
         return client_error_response()
 
-    user_profile_uri = CONFIG['ursHostname'] + token['endpoint']
-    response = requests.get(user_profile_uri, headers={'Authorization': token['token_type'] + ' ' + token['access_token']})
-    response.raise_for_status()
-    user = response.json()
+    #user_profile_uri = CONFIG['ursHostname'] + token['endpoint']
+    #response = requests.get(user_profile_uri, headers={'Authorization': token['token_type'] + ' ' + token['access_token']})
+    #response.raise_for_status()
+    #user = response.json()
+    #user_id = user['uid']
+    user_id = token['endpoint'].split('/')[-1]
     expiration_time = datetime.utcnow() + timedelta(seconds=CONFIG['sessionDurationInSeconds'])
     payload = {
-        'user_id': user['uid'],
+        'user_id': user_id,
         'exp': expiration_time.strftime('%s'),
     }
     session_token = jwt.encode(payload, CONFIG['secretKey'], 'HS256')
