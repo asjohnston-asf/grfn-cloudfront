@@ -86,23 +86,19 @@ def get_session_token(request):
 
     token_uri = CONFIG['ursHostname'] + '/oauth/token'
     try:
-        token = URS.fetch_token(token_uri, code=parms['code'][0], client_secret=CONFIG['ursClientPassword'])
+        urs_token = URS.fetch_token(token_uri, code=parms['code'][0], client_secret=CONFIG['ursClientPassword'])
     except InvalidGrantError:
         return client_error_response()
 
-    #user_profile_uri = CONFIG['ursHostname'] + token['endpoint']
-    #response = requests.get(user_profile_uri, headers={'Authorization': token['token_type'] + ' ' + token['access_token']})
-    #response.raise_for_status()
-    #user = response.json()
-    #user_id = user['uid']
-    user_id = token['endpoint'].split('/')[-1]
+    user_id = urs_token['endpoint'].split('/')[-1]
     expiration_time = datetime.utcnow() + timedelta(seconds=CONFIG['sessionDurationInSeconds'])
     payload = {
         'user_id': user_id,
         'exp': expiration_time.strftime('%s'),
     }
     session_token = jwt.encode(payload, CONFIG['secretKey'], 'HS256')
-    redirect_url = parms['state'][0]
+
+    redirect_url = parms.get('state', ['/'])[0]
     response = redirect_response(redirect_url)
     response['headers']['set-cookie'] = set_cookie_header(session_token.decode('utf-8'))
     return response
