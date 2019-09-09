@@ -3,13 +3,12 @@ from urllib.parse import parse_qs
 from datetime import datetime, timedelta
 from http.cookies import SimpleCookie
 
-import requests
 import jwt
-import boto3
+from boto3 import client
 from requests_oauthlib import OAuth2Session
 from oauthlib.oauth2 import InvalidGrantError
 
-SECRETS_MANAGER = boto3.client('secretsmanager', region_name='us-east-1')
+SECRETS_MANAGER = client('secretsmanager', region_name='us-east-1')
 
 CONFIG = None
 URS = None
