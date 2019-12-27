@@ -33,6 +33,10 @@ Parameters:
     Type: String
     Default: "*.jpg"
 
+  cutoffThreshholdInDollars:
+    Type: Number
+    MinValue: 0
+
 Outputs:
 
   DomainName:
@@ -165,6 +169,15 @@ Resources:
         DomainEndpoint: !GetAtt ElasticSearchDomain.DomainEndpoint
         LogBucket: !Ref LogBucket
       TemplateURL: log-parse/cloudformation.yaml
+
+  CutoffStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        Name: !Sub "${AWS::StackName}-cutoff"
+        DistributionId: !Ref Distribution
+        CutoffThreshholdInDollars: !Ref cutoffThreshholdInDollars
+      TemplateURL: cutoff/cloudformation.yaml
 
   LambdaVersionREPLACE:
     Type: AWS::Lambda::Version
