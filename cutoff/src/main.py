@@ -43,14 +43,15 @@ def get_cloudfront_charges():
 def disable_distribution(distribution_id):
     response = CLOUDFRONT.get_distribution_config(Id=distribution_id)
     distribution_config = response['DistributionConfig']
-    distribution_config['Enabled'] = False
-    response = CLOUDFRONT.update_distribution(Id=distribution_id, DistributionConfig=distribution_config, IfMatch=response['ETag'])
+    if distribution_config['Enabled']:
+        print(f'Disabling distribution {distribution_id}')
+        distribution_config['Enabled'] = False
+        response = CLOUDFRONT.update_distribution(Id=distribution_id, DistributionConfig=distribution_config, IfMatch=response['ETag'])
 
 
 def lambda_handler(event, conext):
     charges = get_cloudfront_charges()
-    print(f'Current Charges: {charges}')
+    print(f'Current Charges: ${charges}')
     if charges > CONFIG['Threshhold']:
         print(f'Current charges (${charges}) are greater than threshhold (${CONFIG["Threshhold"]})')
-        print(f'Disabling distribution {CONFIG["DistributionId"]}')
         disable_distribution(CONFIG['DistributionId'])
