@@ -2,81 +2,38 @@ AWSTemplateFormatVersion: 2010-09-09
 
 Parameters:
 
-  ursClientId:
+  authUrl:
     Type: String
 
-  ursClientPassword:
+  publicKey:
     Type: String
-    NoEcho: true
 
-  secretKey:
-    Type: String
-    MinLength: 32
-    NoEcho: true
-
-  ursHostname:
-    Type: String
-    AllowedValues:
-    - https://uat.urs.earthdata.nasa.gov
-    - https://urs.earthdata.nasa.gov
-    Default: https://urs.earthdata.nasa.gov
-
-  sessionDurationInSeconds:
-    Type: Number
-    MinValue: 0
-    Default: 86400
-
-  elasticSearchCidrIp:
+  cookieName:
     Type: String
 
   publicPathPattern:
     Type: String
-    Default: "*.jpg"
+    Default: "*.png"
 
-  cutoffThreshholdInDollars:
-    Type: Number
-    MinValue: 0
+  contentBucket:
+    Type: String
 
-Outputs:
+  logBucket:
+    Type: String
 
-  DomainName:
-    Value: !GetAtt Distribution.DomainName
+  sslCertificateArn:
+    Type: String
+
+  domainName:
+    Type: String
 
 Resources:
-
-  ContentBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub "${AWS::StackName}-content"
-
-  LogBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub "${AWS::StackName}-logs"
 
   OriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
         Comment: !Ref AWS::StackName
-
-  ContentBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref ContentBucket
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-        - Effect: Allow
-          Principal:
-            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
-          Resource: !Sub "${ContentBucket.Arn}/*"
-          Action: s3:GetObject
-        - Effect: Allow
-          Principal:
-            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
-          Resource: !Sub "${ContentBucket.Arn}"
-          Action: s3:ListBucket
 
   Distribution:
     Type: AWS::CloudFront::Distribution
@@ -85,99 +42,45 @@ Resources:
         Comment: !Ref AWS::StackName
         Enabled: True
         PriceClass: PriceClass_100
+        Aliases:
+        - !Ref domainName
+        ViewerCertificate:
+          AcmCertificateArn: !Ref sslCertificateArn
+          SslSupportMethod: sni-only
         Origins:
-        - Id: !Ref ContentBucket
-          DomainName: !GetAtt ContentBucket.DomainName
+        - Id: !Ref contentBucket
+          DomainName: !Sub "${contentBucket}.s3.amazonaws.com"
           S3OriginConfig:
             OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${OriginAccessIdentity}"
         CacheBehaviors:
         - PathPattern: !Ref publicPathPattern
           ForwardedValues:
             QueryString: False
-          TargetOriginId: !Ref ContentBucket
+          TargetOriginId: !Ref contentBucket
           ViewerProtocolPolicy: redirect-to-https
         DefaultCacheBehavior:
           ForwardedValues:
             QueryString: False
-          TargetOriginId: !Ref ContentBucket
+          TargetOriginId: !Ref contentBucket
           ViewerProtocolPolicy: redirect-to-https
           LambdaFunctionAssociations:
           - EventType: viewer-request
             LambdaFunctionARN: !Ref LambdaVersionREPLACE
         Logging:
-          Bucket: !GetAtt LogBucket.DomainName
+          Bucket: !Sub "${logBucket}.s3.amazonaws.com"
+          Prefix: !Ref AWS::StackName
           IncludeCookies: true
-
-  ElasticSearchDomain:
-    Type: AWS::Elasticsearch::Domain
-    Properties:
-      DomainName: !Ref AWS::StackName
-      ElasticsearchVersion: 6.3
-      AccessPolicies: !Sub |-
-        {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Effect": "Allow",
-              "Principal": {
-                "AWS": "*"
-              },
-              "Action": [
-                "es:ESHttpGet",
-                "es:ESHttpPut",
-                "es:ESHttpPost",
-                "es:ESHttpDelete",
-                "es:ESHttpHead"
-              ],
-              "Resource": "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${AWS::StackName}/*",
-              "Condition": {
-                "IpAddress": {
-                  "aws:SourceIp": "${elasticSearchCidrIp}"
-                }
-              }
-            }
-          ]
-        }
-      ElasticsearchClusterConfig:
-        DedicatedMasterEnabled: false
-        InstanceCount: 1
-        InstanceType: t2.small.elasticsearch
-        ZoneAwarenessEnabled: false
-      EBSOptions:
-        EBSEnabled: true
-        VolumeSize: 10
-        VolumeType: gp2
 
   ViewerRequestStack:
     Type: AWS::CloudFormation::Stack
     Properties:
       Parameters:
         name: !Sub "${AWS::StackName}-viewer-request"
-        ursClientId: !Ref ursClientId
-        ursClientPassword: !Ref ursClientPassword
-        secretKey: !Ref secretKey
-        ursHostname: !Ref ursHostname
-        sessionDurationInSeconds: !Ref sessionDurationInSeconds
+        authUrl: !Ref authUrl
+        domainName: !Ref domainName
+        cookieName: !Ref cookieName
+        publicKey: !Ref publicKey
       TemplateURL: viewer-request/cloudformation.yaml
-
-  LogParseStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      Parameters:
-        Name: !Sub "${AWS::StackName}-log-parse"
-        DomainArn: !GetAtt ElasticSearchDomain.DomainArn
-        DomainEndpoint: !GetAtt ElasticSearchDomain.DomainEndpoint
-        LogBucket: !Ref LogBucket
-      TemplateURL: log-parse/cloudformation.yaml
-
-  CutoffStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      Parameters:
-        Name: !Sub "${AWS::StackName}-cutoff"
-        DistributionId: !Ref Distribution
-        CutoffThreshholdInDollars: !Ref cutoffThreshholdInDollars
-      TemplateURL: cutoff/cloudformation.yaml
 
   LambdaVersionREPLACE:
     Type: AWS::Lambda::Version

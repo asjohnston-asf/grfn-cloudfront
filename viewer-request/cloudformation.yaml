@@ -5,29 +5,17 @@ Parameters:
   name:
     Type: String
 
-  ursClientId:
+  authUrl:
     Type: String
 
-  ursClientPassword:
+  domainName:
     Type: String
-    NoEcho: true
 
-  secretKey:
+  cookieName:
     Type: String
-    MinLength: 32
-    NoEcho: true
 
-  ursHostname:
+  publicKey:
     Type: String
-    AllowedValues:
-    - https://uat.urs.earthdata.nasa.gov
-    - https://urs.earthdata.nasa.gov
-    Default: https://urs.earthdata.nasa.gov
-
-  sessionDurationInSeconds:
-    Type: Number
-    MinValue: 0
-    Default: 86400
 
 Outputs:
 
@@ -42,11 +30,10 @@ Resources:
       Name: !Ref name
       SecretString: !Sub |-
         {
-          "ursClientId": "${ursClientId}",
-          "ursClientPassword": "${ursClientPassword}",
-          "ursHostname": "${ursHostname}",
-          "secretKey": "${secretKey}",
-          "sessionDurationInSeconds": ${sessionDurationInSeconds}
+          "authUrl": "${authUrl}",
+          "domainName": "${domainName}",
+          "cookieName": "${cookieName}",
+          "publicKey": "${publicKey}"
         }
 
   Role:
