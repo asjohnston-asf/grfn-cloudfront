@@ -3,10 +3,13 @@ from http.cookies import SimpleCookie
 from urllib.parse import urlunsplit, quote_plus
 
 import jwt
+from jwt.contrib.algorithms.pycrypto import RSAAlgorithm
 from boto3 import client
 
 SECRETS_MANAGER = client('secretsmanager', region_name='us-east-1')
 CONFIG = None
+
+jwt.register_algorithm('RS256', RSAAlgorithm(RSAAlgorithm.SHA256))
 
 
 def load_config(secret_name):
