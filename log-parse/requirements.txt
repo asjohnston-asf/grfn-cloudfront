@@ -1,6 +1,6 @@
 aws-requests-auth==0.4.2
 elasticsearch==7.0.4
-PyJWT==1.7.1
+PyJWT==2.4.0
 
 certifi==2019.6.16
 chardet==3.0.4
